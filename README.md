@@ -222,3 +222,29 @@ Run a script with:
 chmod +x scripts/*.sh
 ./scripts/setup.sh
 ```
+## Documentation
+
+This project includes documentation to help with setup, deployment, monitoring, and troubleshooting.
+
+### Available Documentation
+
+* **Getting Started** – Project setup and installation.
+* **Infrastructure** – AWS resources and Terraform configuration.
+* **Monitoring** – CloudWatch, Prometheus, and Grafana setup.
+* **Dashboards** – Grafana dashboards and key metrics.
+* **Alerting** – Monitoring alerts and notification setup.
+* **Troubleshooting** – Common issues and possible solutions.
+
+### Project Structure
+
+```text
+docs/
+├── setup.md
+├── infrastructure.md
+├── monitoring.md
+├── dashboards.md
+├── alerting.md
+└── troubleshooting.md
+```
+
+Refer to the documentation before deploying changes to the infrastructure.
