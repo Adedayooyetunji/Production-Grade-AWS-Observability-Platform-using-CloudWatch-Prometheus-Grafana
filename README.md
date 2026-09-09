@@ -97,3 +97,18 @@ This project uses **Terraform** to set up and manage the AWS resources.
 
 **Monitoring Flow:**
 `AWS → CloudWatch / Prometheus → Grafana → Dashboards & Alerts`
+## Scripts
+
+This project includes scripts to make setup, deployment, and monitoring easier.
+
+* `setup.sh` – Sets up the monitoring environment.
+* `deploy.sh` – Deploys the infrastructure and services.
+* `cleanup.sh` – Removes deployed resources when they are no longer needed.
+* `health-check.sh` – Checks the status of the monitoring services.
+
+Run a script with:
+
+```bash
+chmod +x scripts/*.sh
+./scripts/setup.sh
+```
