@@ -84,3 +84,16 @@ docker compose down -v
 Never commit AWS credentials, API keys, passwords, or other sensitive information to GitHub.
 
 Use AWS IAM roles, environment variables, AWS Secrets Manager, or another secure secrets-management solution instead.
+
+## Infrastructure
+
+This project uses **Terraform** to set up and manage the AWS resources.
+
+* **EC2** – Runs the applications and monitoring tools.
+* **CloudWatch** – Collects logs and system metrics.
+* **Prometheus** – Collects and monitors application metrics.
+* **Grafana** – Displays metrics in easy-to-read dashboards.
+* **VPC & IAM** – Provide secure networking and access control.
+
+**Monitoring Flow:**
+`AWS → CloudWatch / Prometheus → Grafana → Dashboards & Alerts`
