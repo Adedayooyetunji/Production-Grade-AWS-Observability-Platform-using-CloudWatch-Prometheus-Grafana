@@ -26,6 +26,116 @@ Configure your AWS credentials:
 ```bash
 aws configure
 ```
+## CLI
+
+The AWS CLI and Terraform CLI are used to manage and deploy the observability infrastructure.
+
+### AWS CLI
+
+Check your AWS account:
+
+```bash
+aws sts get-caller-identity
+```
+
+View CloudWatch metrics:
+
+```bash
+aws cloudwatch list-metrics
+```
+
+### Terraform CLI
+
+Initialize Terraform:
+
+```bash
+terraform init
+```
+
+Validate the configuration:
+
+```bash
+terraform validate
+```
+
+Preview changes before deployment:
+
+```bash
+terraform plan
+```
+
+Review the plan carefully, then deploy:
+
+```bash
+terraform apply
+```
+
+Terraform will ask for confirmation before making changes. Only approve the deployment if the changes are expected.
+
+For automated environments:
+
+```bash
+terraform apply -auto-approve
+```
+
+> **Note:** Use `-auto-approve` carefully, especially in production, because it skips manual confirmation.
+
+### Destroy Infrastructure
+
+To remove the infrastructure:
+
+```bash
+terraform destroy
+```
+
+Review the planned changes before confirming the destruction.
+
+### Prerequisites
+
+Make sure the following are installed and configured:
+
+* AWS CLI
+* Terraform
+* AWS account and credentials
+* Git
+
+Configure AWS credentials with:
+
+```bash
+aws configure
+```
+
+Verify your configuration:
+
+```bash
+aws sts get-caller-identity
+```
+## Documentation
+
+This project includes documentation to help with setup, deployment, monitoring, and troubleshooting.
+
+### Available Documentation
+
+* **Getting Started** – Project setup and installation.
+* **Infrastructure** – AWS resources and Terraform configuration.
+* **Monitoring** – CloudWatch, Prometheus, and Grafana setup.
+* **Dashboards** – Grafana dashboards and key metrics.
+* **Alerting** – Monitoring alerts and notification setup.
+* **Troubleshooting** – Common issues and possible solutions.
+
+### Project Structure
+
+```text
+docs/
+├── setup.md
+├── infrastructure.md
+├── monitoring.md
+├── dashboards.md
+├── alerting.md
+└── troubleshooting.md
+```
+
+Refer to the documentation before deploying changes to the infrastructure.
 
 Verify your AWS identity:
 
