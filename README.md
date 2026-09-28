@@ -1,250 +1,108 @@
-# Production-Grade-AWS-Observability-Platform-using-CloudWatch-Prometheus-Grafana
-Production-grade AWS observability platform using Amazon CloudWatch, Prometheus, and Grafana to provide centralized monitoring, metrics collection, visualization, alerting, and infrastructure health insights across AWS workloads.
-## Local Development
+# Production-Grade AWS Observability Platform
+### CloudWatch + Prometheus + Grafana
 
-### Prerequisites
+A Git-driven observability stack for AWS workloads: metrics, logs, alerting, and SLO dashboards, deployed entirely as code.
 
-Before getting started, make sure you have the following installed:
+## Overview
 
-* Git
-* Docker & Docker Compose
-* AWS CLI
-* Terraform
-* An AWS account
+| Layer | Tool | Responsibility |
+|---|---|---|
+| AWS-managed services | Amazon CloudWatch | ALB, RDS, Lambda, SQS, ECS/EKS control plane metrics; service logs; native alarms |
+| Application and Kubernetes | Prometheus (kube-prometheus-stack or Amazon Managed Prometheus) | App `/metrics`, node, kube-state-metrics; Alertmanager routing |
+| Visualization | Grafana (Amazon Managed Grafana or self-hosted) | Unified dashboards across CloudWatch, Prometheus, and logs |
 
-### Clone the Repository
+## Architecture
 
-```bash
-git clone https://github.com/<your-username>/aws-observability-platform.git
-cd aws-observability-platform
+```
+ AWS services ──► CloudWatch Metrics/Logs ──┐
+                       │ alarms             │
+                       ▼                    ▼
+                  SNS ─► PagerDuty/Slack   Grafana ◄── Prometheus / AMP
+                                              ▲            ▲
+                                        Loki / CW Logs     │ remote_write
+                                                     EKS: exporters,
+                                                     kube-state-metrics,
+                                                     app /metrics
+                                                     Alertmanager ─► PagerDuty/Slack
 ```
 
-### Configure AWS CLI
+## Features
 
-Configure your AWS credentials:
+- **Infrastructure as code:** Terraform for VPC, EKS, AMP/AMG, IRSA roles, and CloudWatch alarms; Helm/Argo CD for in-cluster components.
+- **High availability:** multi-replica Prometheus, remote write to AMP or Thanos, persistent volumes, clustered Alertmanager.
+- **Security:** IRSA (no static keys), private endpoints, SSO for Grafana, read-only least-privilege CloudWatch access.
+- **SLO-driven alerting:** multi-window burn-rate alerts on availability and latency SLIs, each with a runbook link.
+- **Dashboards as code:** provisioned from JSON or Grafonnet, reviewed via pull requests.
+- **Cost control:** log retention policies, custom metric cardinality limits, dropped high-cardinality labels.
 
-```bash
-aws configure
+## Repository Layout
+
 ```
-## CLI
-
-The AWS CLI and Terraform CLI are used to manage and deploy the observability infrastructure.
-
-### AWS CLI
-
-Check your AWS account:
-
-```bash
-aws sts get-caller-identity
-```
-
-View CloudWatch metrics:
-
-```bash
-aws cloudwatch list-metrics
+terraform/      # network, eks, amp, amg, cloudwatch alarms
+helm/           # kube-prometheus-stack values, exporters
+dashboards/     # Grafana JSON / Grafonnet
+alerts/         # Prometheus rules + CloudWatch alarm definitions
+docs/           # architecture diagram, runbooks, SLOs
 ```
 
-### Terraform CLI
+## Prerequisites
 
-Initialize Terraform:
+- AWS account with permissions to create VPC, EKS, IAM, AMP, and AMG resources
+- Terraform >= 1.6, kubectl, Helm 3, AWS CLI v2
 
-```bash
-terraform init
-```
-
-Validate the configuration:
+## Quick Start
 
 ```bash
-terraform validate
-```
-
-Preview changes before deployment:
-
-```bash
-terraform plan
-```
-
-Review the plan carefully, then deploy:
-
-```bash
-terraform apply
-```
-
-Terraform will ask for confirmation before making changes. Only approve the deployment if the changes are expected.
-
-For automated environments:
-
-```bash
-terraform apply -auto-approve
-```
-
-> **Note:** Use `-auto-approve` carefully, especially in production, because it skips manual confirmation.
-
-### Destroy Infrastructure
-
-To remove the infrastructure:
-
-```bash
-terraform destroy
-```
-
-Review the planned changes before confirming the destruction.
-
-### Prerequisites
-
-Make sure the following are installed and configured:
-
-* AWS CLI
-* Terraform
-* AWS account and credentials
-* Git
-
-Configure AWS credentials with:
-
-```bash
-aws configure
-```
-
-Verify your configuration:
-
-```bash
-aws sts get-caller-identity
-```
-## Documentation
-
-This project includes documentation to help with setup, deployment, monitoring, and troubleshooting.
-
-### Available Documentation
-
-* **Getting Started** – Project setup and installation.
-* **Infrastructure** – AWS resources and Terraform configuration.
-* **Monitoring** – CloudWatch, Prometheus, and Grafana setup.
-* **Dashboards** – Grafana dashboards and key metrics.
-* **Alerting** – Monitoring alerts and notification setup.
-* **Troubleshooting** – Common issues and possible solutions.
-
-### Project Structure
-
-```text
-docs/
-├── setup.md
-├── infrastructure.md
-├── monitoring.md
-├── dashboards.md
-├── alerting.md
-└── troubleshooting.md
-```
-
-Refer to the documentation before deploying changes to the infrastructure.
-
-Verify your AWS identity:
-
-```bash
-aws sts get-caller-identity
-```
-
-### Start the Monitoring Stack
-
-Start Prometheus and Grafana using Docker Compose:
-
-```bash
-docker compose up -d
-```
-
-Verify that the containers are running:
-
-```bash
-docker compose ps
-```
-
-### Access Grafana and Prometheus
-
-After starting the stack, open:
-
-* Grafana: `http://localhost:3000`
-* Prometheus: `http://localhost:9090`
-
-### Deploy AWS Infrastructure
-
-If Terraform is included in the project:
-
-```bash
+# 1. Provision infrastructure
 cd terraform
 terraform init
-terraform plan
-terraform apply
+terraform apply -var-file=env/prod.tfvars
+
+# 2. Connect to the cluster
+aws eks update-kubeconfig --name <cluster-name> --region <region>
+
+# 3. Install the Prometheus stack
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace -f helm/kube-prometheus-stack/values.yaml
+
+# 4. Apply alert rules
+kubectl apply -f alerts/prometheus/
 ```
 
-### Stop the Environment
+## Alerting Strategy
 
-To stop the services:
+1. **Page** only on symptoms tied to SLOs (error-budget burn), not raw CPU or memory.
+2. **Ticket** for slow-burn and capacity issues.
+3. Every alert carries `severity`, `service`, and `runbook_url` labels/annotations.
+4. Alertmanager groups and inhibits related alerts to reduce noise.
 
-```bash
-docker compose down
+Example burn-rate rule (99.9% availability SLO):
+
+```yaml
+- alert: HighErrorBudgetBurn
+  expr: |
+    (sum(rate(http_requests_total{code=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))) > (14.4 * 0.001)
+    and
+    (sum(rate(http_requests_total{code=~"5.."}[1h])) / sum(rate(http_requests_total[1h]))) > (14.4 * 0.001)
+  for: 2m
+  labels: { severity: page }
+  annotations:
+    summary: "Fast error-budget burn"
+    runbook_url: "https://github.com/<org>/<repo>/blob/main/docs/runbooks/error-budget.md"
 ```
 
-To remove containers, networks, and volumes:
+## Validation
 
-```bash
-docker compose down -v
-```
+- Load and chaos tests confirm alerts fire and route correctly.
+- Quarterly game-day exercise using the runbooks in `docs/runbooks/`.
 
-### Security
+## Roadmap
 
-Never commit AWS credentials, API keys, passwords, or other sensitive information to GitHub.
+- [ ] Distributed tracing (OpenTelemetry + X-Ray or Tempo)
+- [ ] Log-to-metric correlation dashboards
+- [ ] Automated cost reports for observability spend
 
-Use AWS IAM roles, environment variables, AWS Secrets Manager, or another secure secrets-management solution instead.
+## License
 
-## Infrastructure
-
-This project uses **Terraform** to set up and manage the AWS resources.
-
-* **EC2** – Runs the applications and monitoring tools.
-* **CloudWatch** – Collects logs and system metrics.
-* **Prometheus** – Collects and monitors application metrics.
-* **Grafana** – Displays metrics in easy-to-read dashboards.
-* **VPC & IAM** – Provide secure networking and access control.
-
-**Monitoring Flow:**
-`AWS → CloudWatch / Prometheus → Grafana → Dashboards & Alerts`
-## Scripts
-
-This project includes scripts to make setup, deployment, and monitoring easier.
-
-* `setup.sh` – Sets up the monitoring environment.
-* `deploy.sh` – Deploys the infrastructure and services.
-* `cleanup.sh` – Removes deployed resources when they are no longer needed.
-* `health-check.sh` – Checks the status of the monitoring services.
-
-Run a script with:
-
-```bash
-chmod +x scripts/*.sh
-./scripts/setup.sh
-```
-## Documentation
-
-This project includes documentation to help with setup, deployment, monitoring, and troubleshooting.
-
-### Available Documentation
-
-* **Getting Started** – Project setup and installation.
-* **Infrastructure** – AWS resources and Terraform configuration.
-* **Monitoring** – CloudWatch, Prometheus, and Grafana setup.
-* **Dashboards** – Grafana dashboards and key metrics.
-* **Alerting** – Monitoring alerts and notification setup.
-* **Troubleshooting** – Common issues and possible solutions.
-
-### Project Structure
-
-```text
-docs/
-├── setup.md
-├── infrastructure.md
-├── monitoring.md
-├── dashboards.md
-├── alerting.md
-└── troubleshooting.md
-```
-
-Refer to the documentation before deploying changes to the infrastructure.
+MIT
